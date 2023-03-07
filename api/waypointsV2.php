@@ -142,8 +142,6 @@ while ($jsonSizedata > 2000) {
 
     $jsonSizedata = getSize($data);
 }
-print_r($data);
-exit();
 
 echo '{' . implode(',', $data) . '}';
 
