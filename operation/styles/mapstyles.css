@@ -1,0 +1,90 @@
+.image-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.image-container .image-wrapper {
+  position: relative;
+  flex: 1;
+  max-width: calc(50% - 0.5rem); /* reduce max-width slightly to fit within container and margin */
+  height: auto;
+  margin: 1rem 1rem 1rem 1rem; /* reduce right margin on first image and left margin on second image to 0.5rem */
+  margin-left: 1.5rem;
+}
+
+
+.image-container .image-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border: 3px solid rgba(0, 0, 0, 0.2); /* add black border of thickness 2 */
+  box-sizing: border-box; /* include border in image dimensions */
+  border-radius: 8px; /* add slightly rounded corners */
+}
+
+.image-container .image-wrapper .image-text {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 0.5rem;
+  font-size: 1.2rem;
+  color: white;
+  background-color: rgba(0, 0, 0, 0.7);
+  border-radius: 8px 0px 8px 0px;
+}
+
+
+@media only screen and (max-width: 768px) {
+  .image-container {
+    flex-wrap: wrap;
+  }
+  .image-container .image-wrapper {
+    max-width: 100%;
+    flex-basis: 50%;
+  }
+}
+
+  
+
+#image-modal {
+  display: none;
+  position: fixed;
+  z-index: 99999;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.9);
+  overflow: auto;
+}
+  
+#modal-image {
+  max-width: 100%;
+  max-height: 90vh;
+  margin: auto;
+  display: block;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+  
+.close-button {
+  color: #fff;
+  float: right;
+  font-size: 2rem;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0 1rem;
+}
+
+.close-button:hover {
+  color: #ccc;
+}
+  
+
+  
