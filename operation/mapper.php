@@ -65,6 +65,7 @@ function generateOptimizedMap($orderkey,$apiKey)
     $url = "http://localhost/test4sight/api/waypointsV2.php?orderkey=$orderkey&mode=1";
     $response = file_get_contents($url);
 
+
     // Decode the response into an array of waypoints.
     $waypoints = json_decode($response, true);
 

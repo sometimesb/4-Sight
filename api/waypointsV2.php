@@ -133,17 +133,17 @@ while ($jsonSizedata > 2000) {
     $data = [];
     foreach ($normal_data as $key => $value) {
         if($mode==1){
-        //$data[] = '"' . ($key + 1) . '": ' . floor(floatval($value) * 10 ** 7);
-        $data[] = '"' . ($key + 1) . '": "' . $value . '"';
-        }
-        else{
-        //$data[] = '"' . ($key+1) . '": "' . floor(($value)*10**7) . '"';
-        $data[] = '"' . ($key+1) . '": "' . strval(floor(($value)*10**7)) . '"';
+            $data[] = '"' . ($key + 1) . '": "' . $value . '"';
+        } else {
+            $data[] = '"' . ($key + 1) . '": "' . ($value*10**5) . '"';
         }
     }
+    
 
     $jsonSizedata = getSize($data);
 }
+print_r($data);
+exit();
 
 echo '{' . implode(',', $data) . '}';
 
