@@ -132,16 +132,23 @@ while ($jsonSizedata > 2000) {
 
     $data = [];
     foreach ($normal_data as $key => $value) {
-        if($mode==1){
-            $data[] = '"' . ($key + 1) . '": "' . $value . '"';
-        } else {
-            $data[] = '"' . ($key + 1) . '": "' . ($value*10**5) . '"';
-        }
+        $data[] = '"' . ($key + 1) . '": "' . (float)$value . '"';
     }
     
 
     $jsonSizedata = getSize($data);
 }
+
+if($mode == 0){
+    $data = [];
+    foreach ($normal_data as $key => $value) {
+        $data[] = '"' . ($key + 1) . '": "' . (float)$value*10**7 . '"';
+    }
+}
+
+
+
+
 
 echo '{' . implode(',', $data) . '}';
 
