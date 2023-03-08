@@ -1,23 +1,32 @@
 <?php
-// Set the response content type to JSON
-header("Content-Type: application/json");
 
 //initial require database file.
 require "../login/includes/dbh.inc.php";
 
-// Initialize variables
-$haversine = 0;
-$orderkey = $_GET["orderkey"] ?? null;
-$mode = isset($_GET['mode']) ? $_GET['mode'] : 0;
+// Define max size for jsonData
 define('MAXIMUM_SIZE', 2000);
 
-// Function to get everything setup.
-function setup(){
-    global $haversine, $orderkey, $mode;
+// Get orderKey from header
+$orderkey = $_GET["orderkey"] ?? null;
 
-    if (!isset($orderkey)) {
-        echo json_encode(["error" => "An orderkey must be provided."]);
-        exit();
+// Function to get everything setup.
+function setup($orderkey){
+    /**
+     * Check if an orderkey has been provided.
+     *
+     * @param mixed $orderkey The orderkey variable.
+     * @return void
+     */
+
+    header("Content-Type: application/json"); // Set the response content type to JSON
+    
+    global $mode; // Access the global mode variable.
+
+    $mode = isset($_GET['mode']) ? $_GET['mode'] : 0;
+
+    if (!isset($orderkey)) { // Check if the orderkey variable is not set.
+        echo json_encode(["error" => "An orderkey must be provided."]); // Output a JSON error message.
+        exit(); // Exit the script.
     }
 }
 
@@ -66,7 +75,7 @@ function getSize($arr) {
     return $totalSize; // Return the total size
 }
 
- // Function to get uidUsers from an OrderKey
+// Function to get uidUsers from an OrderKey
 function fetchUserIdFromOrderKey($orderkey, $conn) {
     /**
      * Fetches the user ID associated with the given order key.
@@ -97,7 +106,7 @@ function fetchUserIdFromOrderKey($orderkey, $conn) {
     return $row['uidUsers'];
 }
 
- // Function to prepare routes from the user table
+// Function to prepare routes from the user table
 function selectFromUserTable($uid, $conn) {
     /**
      * Selects all rows from the table associated with the given user ID.
@@ -283,7 +292,7 @@ function formatWaypoints($orderkey, $mode, $conn) {
 }
 
 // Initialize the environment
-setup();
+setup($orderkey);
 // Fetch the user ID from the order key
 $row = fetchUserIdFromOrderKey($orderkey, $conn);
 // Select user data from the database

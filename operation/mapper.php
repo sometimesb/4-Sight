@@ -2,20 +2,16 @@
 // include database connection
 require_once  '../login/includes/dbh.inc.php';
 
-// set width and height for static maps
-
-
-/**
- * Generate a static map from an array of coordinates.
- *
- * @param array $coordinates The array of coordinates.
- * @param array $name The names of the coordinates.
- * @param int $len The length of the array.
- * @return string The response from the API.
- */
-
 function generateStaticMap($coordinates, $name, $len,$apiKey)
 {
+    /**
+     * Generate a static map from an array of coordinates.
+     *
+     * @param array $coordinates The array of coordinates.
+     * @param array $name The names of the coordinates.
+     * @param int $len The length of the array.
+     * @return string The response from the API.
+     */
     $width = 1024;
     $height = 768;
     // Transform the coordinates into the format expected by the API.
@@ -48,16 +44,14 @@ function generateStaticMap($coordinates, $name, $len,$apiKey)
     return $response;
 }
 
-/**
- * Generate an optimized map from an order key.
- *
- * @param string $orderkey The order key.
- * @return string The response from the API.
- */
-
 function generateOptimizedMap($orderkey,$apiKey)
 {
-
+    /**
+     * Generate an optimized map from an order key.
+     *
+     * @param string $orderkey The order key.
+     * @return string The response from the API.
+     */
     $width = 1024;
     $height = 768;
 
