@@ -9,7 +9,7 @@ A jacket designed for the blind to get around via strategically located vibratio
 NOT a super simple project like everything else, this project took about a year in software + hardware development. 
 Only the website code is published above, the arduino (hardware) code is not published.
 * HTML - structure
-* CSS - design
+* CSS - styling
 * PHP - API
 * JS - interaction
 * Arduino - hardware control
