@@ -148,7 +148,6 @@ float Ftemp;
 float Qair;
 float noHum;
 
-
 void setup() {
   nodemcu.begin(4800);
   delay(1000);
@@ -212,153 +211,158 @@ void playSong() {
   }
 }
 
-
-
-
 void loop() {
-//  playSong();
-  
-  //registers and tracks what state the switch is in 
+  // Play a song (if required)
+  // playSong();
+
+  // Read the state of the switch
   byte switchState = digitalRead(switchPin);
+  
+  // Turn on an external LED
   analogWrite(A2, 255);
 
-  // set the cursor to column 0, line 1
-  // (note: line 1 is the second row, since counting begins with 0):
+  // Display sensor readings on LCD
   lcd.setCursor(0, 0);
-    if (! bme.performReading()) {
+  if (!bme.performReading()) {
     Serial.println("Failed to perform reading :(");
     return;
   }
-  //Temperature
+
+  // Temperature
   Serial.print("Temperature = ");
-  Serial.print(bme.temperature-2.5);
+  Serial.print(bme.temperature - 2.5);
   Serial.print(" *C = ");
-  Ftemp = ((bme.temperature-2.5)*1.8+32);
+  Ftemp = ((bme.temperature - 2.5) * 1.8 + 32);
   Serial.print(Ftemp);
   Serial.println(" *F");
-  
+
   lcd.print("T=");
   lcd.print(round(Ftemp));
   lcd.write(byte(0));
   lcd.print("F");
 
-  //Pressure
+  // Pressure
   Serial.print("Pressure = ");
   Serial.print(bme.pressure / 100.0);
   Serial.println(" hPa");
-  
-  //Air Quality
+
+  // Air Quality
   Serial.print("Air:");
   Qair = (bme.gas_resistance / 1000.0);
   Serial.print(Qair);
   Serial.print("KOhms ");
-  
+
   lcd.setCursor(8, 0);
   lcd.print("Air:");
-  if (Qair > 300){
+  if (Qair > 300) {
     lcd.print("Good");
     Serial.println("(Good)");
-  }
-  else if (Qair < 120){
+  } else if (Qair < 120) {
     lcd.print("Poor");
     Serial.println("(Poor)");
-  }
-  else {
+  } else {
     lcd.print("Fair");
     Serial.println("(Fair)");
   }
-  
-  //Humidity
+
+  // Humidity
   Serial.print("Humidity = ");
   noHum = bme.humidity;
   Serial.print(noHum);
   Serial.println(" %");
-  
+
   lcd.setCursor(0, 1);
   lcd.print("Humidity= ");
   lcd.print(noHum);
   lcd.print("%");
-  
-  ct = ct+1;
+
+  ct = ct + 1;
   Serial.println(ct);
   Serial.println();
-  
-  if(switchState==LOW)
-  {
-    // turn screen on:
+
+  // Handle switch state
+  if (switchState == LOW) {
+    // Turn the screen on
     digitalWrite(screen, HIGH);
 
-    if ((ct >1300) && (Qair < 20) || (Ftemp > 100)){
-      digitalWrite(buzzer,HIGH);} 
-      
-    if ((ct >1300) && (Qair < 70)){
-      digitalWrite(buzzer,HIGH);
-      delay(100);//wait for 100ms
-      digitalWrite(buzzer,LOW);
-      delay(100);}//wait for 100ms
-      
-    if ((ct >1300) && (Qair < 120) || (Ftemp > 90)){
-      digitalWrite(buzzer,HIGH);
-      delay(250);//wait for 250ms
-      digitalWrite(buzzer,LOW);
-      delay(250);}//wait for 250ms
-      
-    if (Qair > 120) {digitalWrite(buzzer,LOW);}
+    // Perform actions based on conditions
+    if ((ct > 1300) && (Qair < 20) || (Ftemp > 100)) {
+      digitalWrite(buzzer, HIGH);
+    }
+
+    if ((ct > 1300) && (Qair < 70)) {
+      digitalWrite(buzzer, HIGH);
+      delay(100);
+      digitalWrite(buzzer, LOW);
+      delay(100);
+    }
+
+    if ((ct > 1300) && (Qair < 120) || (Ftemp > 90)) {
+      digitalWrite(buzzer, HIGH);
+      delay(250);
+      digitalWrite(buzzer, LOW);
+      delay(250);
+    }
+
+    if (Qair > 120) {
+      digitalWrite(buzzer, LOW);
+    }
 
     Serial.println("switch turned on");
-  }
-   else
-    {
+  } else {
+    // Turn the screen off
     Serial.println("switch turned off");
     digitalWrite(screen, LOW);
-    }
+  }
+
   delay(500);
   Serial.println(" ");
-   
-  //x,y so far
-  if ((gauntlet.available())) {
+
+  // Receive coordinates from Gauntlet
+  if (gauntlet.available()) {
     String receivedData = gauntlet.readString();
     double X_Cord, Y_Cord;
     bool route_status = false;
 
     DynamicJsonDocument doc(128);
     deserializeJson(doc, receivedData);
-    
 
     for (JsonPair pair : doc.as<JsonObject>()) {
       String key = pair.key().c_str();
       String coordinate = pair.value().as<String>();
-      
+
       if (key == "X_Cord") {
         X_Cord = coordinate.toDouble();
-      }
-      else if (key == "Y_Cord") {
+      } else if (key == "Y_Cord") {
         Y_Cord = coordinate.toDouble();
-      }
-      else if(key =="route_status"){
+      } else if (key == "route_status") {
         route_status = true;
         if (route_status) {
           Serial.println("RECEIVED ROUTE STATUS!!");
           Serial.println("ready to play song");
           playSong();
-         }
+        }
       }
     }
-    
+
+    // Clear the JSON document
     doc.clear();
+
+    // Populate JSON document with sensor data
     doc["X"] = X_Cord;
     doc["Y"] = Y_Cord;
     doc["T"] = Ftemp;
     doc["H"] = noHum;
     doc["Q"] = Qair;
 
-    //Print JSON to Serial monitor
+    // Print JSON to Serial monitor
     serializeJson(doc, Serial);
-    
-    //Send data to NodeMCU
+
+    // Send data to NodeMCU
     serializeJson(doc, nodemcu);
     nodemcu.println();
     Serial.println();
     delay(2000);
   }
 }
+
