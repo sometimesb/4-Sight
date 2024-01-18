@@ -6,100 +6,137 @@
 #include <Adafruit_BNO055.h>
 #include <SparkFun_Ublox_Arduino_Library.h>
 #include <Arduino.h>
-#include <avr/wdt.h> // Include the ATmel library
+#include <avr/wdt.h>
 
+// Declaration of SoftwareSerial instances for communication with NodeMCU and Gauntlet
 SoftwareSerial nodemcu(10, 11);
-SoftwareSerial gauntlet(5,6);
+SoftwareSerial gauntlet(5, 6);
+
+// Object for handling UBLOX GPS module
 SFE_UBLOX_GPS myGPS;
+
+// Object for interfacing with BNO055 sensor
 Adafruit_BNO055 bno = Adafruit_BNO055(55, 0x28);
 
-String * latitudes, * longitudes;
-double * glatitudes, * glongitudes;
+// Arrays to store latitude and longitude strings and their corresponding doubles
+String* latitudes;
+String* longitudes;
+double* glatitudes;
+double* glongitudes;
 
+// Variables to manage coordinate data and navigation state
 int size;
 int spot = 0;
 int coordinateCount = 0;
 int previousCountIndex = 0;
-int previousCoordinateCounts[2] = {0,0};
+int previousCoordinateCounts[2] = {0, 0};
 
+// Variables for storing current latitude and longitude
 float latitude;
 float longitude;
 
+// Variable to store error messages during data processing
 String errorMessage;
 
+// Constants for mathematical and system configurations
 const int pi = M_PI;
 const int tolerance = 8.5;
 const int motorint = 255;
 const int refreshtime = 500;
-const int haptic[]={A0, A1, A2, A3,A4,A5,A6,A7}; //has to be PWM
 
+// Array of pins for haptic feedback motors (PWM pins)
+const int haptic[] = {A0, A1, A2, A3, A4, A5, A6, A7};
+
+// Conversion factor for GPS coordinates
 const float gpsconvert = 1 * pow(10, -7);
 
+// Flags and state variables for program control
 bool flag = false;
 bool endroute = false;
 bool coordinateflag = false;
 bool waitingForData = false;
 bool nodemcuError = false;
 
+// Maximum size for JSON document during serialization
 const size_t MAX_JSON_SIZE = 3000;
 StaticJsonDocument<MAX_JSON_SIZE> doc;
 
 void setup() {
+  // Initialize serial communication with a baud rate of 4800
   Serial.begin(4800);
   nodemcu.begin(4800);
   gauntlet.begin(4800);
   
+  // Print a message indicating the start of the program
   Serial.println("We just started back up");
 
+  // Set the mode of haptic feedback pins to OUTPUT
   for (int i = 0; i < 8; i++) {
     pinMode(haptic[i], OUTPUT);
   }
   
+  // Initialize the BNO055 sensor
   while (!bno.begin()) {
     delay(100);
     Serial.println("bno not started");
   }
 
+  // Initialize the GPS module
   while (myGPS.begin() == false) {
     delay(100);
     Serial.println("gps not started");
   }
+
+  // Configure GPS module settings
   uint8_t system, gyro, accel, mag;
   system = gyro = accel = mag = 0;
   myGPS.setI2COutput(COM_TYPE_UBX);
   myGPS.saveConfiguration();
-  pinMode(LED_BUILTIN, OUTPUT); // initialize the built-in LED pin as an output
 
+  // Initialize the built-in LED pin as an output
+  pinMode(LED_BUILTIN, OUTPUT);
 }
 
 void printArrays(String * latitudes, String * longitudes, int size) {
+  // Convert latitude and longitude Strings to double arrays
   for (int i = 0; i < size; i++) {
     glatitudes[i] = latitudes[i].toDouble() * gpsconvert;
     glongitudes[i] = longitudes[i].toDouble() * gpsconvert;
   }
 }
 
-float head(){
+float head() {
+  // Get the current heading from the BNO055 sensor
   sensors_event_t orientationData;
   bno.getEvent(&orientationData, Adafruit_BNO055::VECTOR_EULER);
-  float head=orientationData.orientation.x;
+  
+  // Extract and return the x-axis orientation (heading)
+  float head = orientationData.orientation.x;
   return head;
 }
 
 void vibrate(float hdif) {
-  if(endroute == false){
+  // Check if the route has not reached its end
+  if (endroute == false) {
+    // Calculate motor value based on heading difference
     int motorvalue = round(hdif / 45);
+    
+    // Ensure motor value does not exceed the available motors
     if (motorvalue > 7) motorvalue = 0;
+
+    // Activate the specified motor and deactivate others
     analogWrite(haptic[motorvalue], motorint);
     for (int i = 0; i < 8; i++) {
       if (i != motorvalue)
         analogWrite(haptic[i], 0);
     }
+
+    // Print a message indicating which motor vibrated
     Serial.print("MOTOR VIBRATED: ");
     Serial.print(motorvalue);
     Serial.println(" ");
-  }
-  else{
+  } else {
+    // Turn off all motors when the route reaches its end
     for (int i = 0; i < 8; i++) {
       analogWrite(haptic[i], 0);
     }
@@ -107,32 +144,42 @@ void vibrate(float hdif) {
 }
 
 void motoroff(int y) {
+  // Turn off all motors except the one specified by 'y'
   for (int i = 0; i < 8; i++) {
     if (i != y) {
-      analogWrite(haptic[i], 0);
+      analogWrite(haptic[i], 0); // Set PWM value to 0 for motor deactivation
     }
   }
 }
 
 void allmotoroff() {
+  // Turn off all motors by setting PWM values to 0
   for (int i = 0; i < 8; i++) {
-    analogWrite(haptic[i], 0);
+    analogWrite(haptic[i], 0); // Set PWM value to 0 for motor deactivation
   }
 }
 
-
 void motoron() {
+  // Activate all motors by setting PWM values to maximum intensity
   for (int i = 0; i < 8; i++) {
     analogWrite(haptic[i], motorint);
   }
 }
 
 void receivedata() {
+  // Print a message indicating data reception
   Serial.println("RECEIVING DATA...");
+  
+  // Read the data received from NodeMCU
   String receivedData = nodemcu.readString();
+  
+  // Print the received data
   Serial.println("Received data: " + receivedData);
+  
+  // Attempt to deserialize the received JSON data
   DeserializationError error = deserializeJson(doc, receivedData);
   
+  // Check for deserialization errors
   if (error) {
     Serial.print("Deserialization error: ");
     Serial.println(error.c_str());
@@ -141,11 +188,13 @@ void receivedata() {
     return "error";
   }
 
+  // Check if the JSON data contains an "error" key
   if (doc.containsKey("error")) {
     doc.clear();
     return "error";
   }
 
+  // Check if the JSON data contains a "data" key
   if (doc.containsKey("data")) {
     doc.clear();
     Serial.println("Data received, waiting for coordinates...");
@@ -153,47 +202,56 @@ void receivedata() {
     coordinateflag = false;
     return;
   } else {
+    // Reset error flags and clear memory for previous data
     nodemcuError = false;
     delete[] latitudes;
     delete[] longitudes;
     delete[] glatitudes;
     delete[] glongitudes;
 
-    waitingForData = false; // reset the flag
+    // Reset flags and counters
+    waitingForData = false;
     coordinateflag = true;
     int coordinateCount = 0;
 
+    // Iterate over key-value pairs in the JSON data
     for (JsonPair pair : doc.as<JsonObject>()) {
       String key = pair.key().c_str();
       String coordinate = pair.value().as<String>();
       coordinateCount++;
-//      Serial.println("Coordinate " + key + ": " + coordinate);
+      // Uncomment the following line to print each coordinate
+      // Serial.println("Coordinate " + key + ": " + coordinate);
     }
 
+    // Print the total number of coordinates received
     Serial.println("Number of coordinates: " + String(coordinateCount));
-    if (coordinateCount == 0) {
-      Serial.println("No coordinates received.");
+
+    // Check for invalid number of coordinates
+    if (coordinateCount == 0 || coordinateCount % 2 != 0) {
+      Serial.println("Invalid number of coordinates received.");
       nodemcuError = true;
       return "error";
     }
 
-    if (coordinateCount % 2 != 0) {
-      Serial.println("Received an odd number of coordinates");
-      nodemcuError = true;
-      return "error";
-    }
-
+    // Calculate the size based on the number of coordinates
     size = coordinateCount / 2;
+    
+    // Allocate memory for latitude, longitude arrays
     latitudes = new String[size];
     longitudes = new String[size];
     glatitudes = new double[size];
     glongitudes = new double[size];
+    
+    // Initialize index variables
     int latIndex = 0;
     int lonIndex = 0;
 
+    // Populate latitude and longitude arrays from JSON data
     for (JsonPair pair : doc.as<JsonObject>()) {
       String key = pair.key().c_str();
       String coordinate = pair.value().as<String>();
+      
+      // Determine whether the coordinate is latitude or longitude
       if (key.toInt() % 2 == 0) {
         longitudes[lonIndex] = coordinate;
         lonIndex++;
@@ -203,74 +261,65 @@ void receivedata() {
       }
     }
 
+    // Convert String arrays to double arrays
     printArrays(latitudes, longitudes, size);
+    
+    // Print the size of the arrays
     Serial.print("Size is: ");
     Serial.println(size);
   }
 }
 
-
 void loop() {
+  // Check if there is data available from NodeMCU
   if (nodemcu.available()) {
-    endroute=false;
-    spot =0;
-    receivedata();
+    endroute = false;
+    spot = 0;
+    receivedata();  // Call the function to process received data
   }
   
+  // Check for NodeMCU communication error
   if (nodemcuError) {
     nodemcu.print("error");
     nodemcuError = false;
     delay(1000);
+
     // Reset the microcontroller using the watchdog timer
-    wdt_enable(WDTO_15MS); // enable the watchdog timer with a 15ms timeout
-    while (1) {} // wait for the microcontroller to reset
+    wdt_enable(WDTO_15MS); // Enable the watchdog timer with a 15ms timeout
+    while (1) {} // Wait for the microcontroller to reset
     return;
   }
 
+  // Process GPS data if conditions are met
   if (size > 0 && coordinateflag && !endroute) {
-    // calculate latitude and longitude
-//    float latitude = 35.847452810734;
-//    float longitude = -86.366947463602;
-
+    // Calculate latitude and longitude
     latitude = (myGPS.getLatitude()) * gpsconvert;
     longitude = (myGPS.getLongitude()) * gpsconvert;
     
-    // calculate heading and goal heading
+    // Calculate heading and goal heading
     float heading = head();
     float gheading = TinyGPSPlus::courseTo(latitude, longitude, glatitudes[spot], glongitudes[spot]);
     
-    // calculate distance and heading difference
+    // Calculate distance and heading difference
     float distance = TinyGPSPlus::distanceBetween(latitude, longitude, glatitudes[spot], glongitudes[spot]);
     float hdif = abs(gheading - heading);
     vibrate(hdif);
     
-    // update spot if distance is less than tolerance
+    // Update spot if distance is less than tolerance
     if (distance < tolerance) {
       spot++;
     }
-//    if (spot > size*2 ) {
-//      Serial.println("OVERFLOW!!");
-//      Serial.println(coordinateCount);
-//      Serial.println(spot);
-//      while(1); // halt all operation and break out of the void loop
-//      spot = 0;
-//    }
 
-    // print debug information
+    // Print debug information
     Serial.println("------------------------------------");
-//    Serial.print("LAT: ");  Serial.print(latitude, 7); Serial.println(" ");
-//    Serial.print("LON: ");  Serial.print(longitude, 7); Serial.println(" ");
-//    Serial.print("GLAT: ");  Serial.print(glatitudes[spot], 7); Serial.println(" ");
-//    Serial.print("GLON: ");  Serial.print(glongitudes[spot], 7); Serial.println(" ");
     Serial.print("HEADING: ");  Serial.print(heading); Serial.println(" ");
     Serial.print("GOAL HEADING: ");  Serial.print(gheading); Serial.println(" ");
-//    Serial.print("HEADING DIFFERENCE: ");  Serial.print(hdif); Serial.println(" ");
     Serial.print("SIZE: ");  Serial.print(size); Serial.println(" ");
     Serial.print("DISTANCE TO: ");  Serial.print(distance); Serial.println(" ");
     Serial.print("I value is: "); Serial.print(spot); Serial.println(" ");
     Serial.println("------------------------------------");
 
-    // serialize and send data every 30 seconds
+    // Serialize and send data every 30 seconds
     static unsigned long last_sent = 0;
     if (millis() - last_sent >= 30000) {
       DynamicJsonDocument doc(256);
@@ -282,11 +331,13 @@ void loop() {
       gauntlet.print(serialized_data);
       last_sent = millis();
     }
-    digitalWrite(LED_BUILTIN, HIGH); // turn on the LED
+    digitalWrite(LED_BUILTIN, HIGH); // Turn on the LED
     delay(500);
-    if(spot == size+1){
+
+    // Check if the end of the route is reached
+    if (spot == size + 1) {
       Serial.println("We hit the end route");
-      allmotoroff();
+      allmotoroff();  // Turn off all motors
       Serial.println("All motors shut off");
       DynamicJsonDocument doc(256);
       doc["route_status"] = true;
@@ -297,6 +348,7 @@ void loop() {
       endroute = true;
     }
   } else {
-    digitalWrite(LED_BUILTIN, LOW); // turn off the LED
+    digitalWrite(LED_BUILTIN, LOW); // Turn off the LED
   }
 }
+
