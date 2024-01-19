@@ -51,7 +51,7 @@ void readAndParseData() {
   // Read the data from gauntlet
   String receivedData = gauntlet.readString();
   HTTPClient http;
-  
+
   // Check if the received data is missing the second bracket
   if (receivedData.indexOf("}") == -1) {
     // If missing, add the second bracket to the received data
@@ -74,7 +74,7 @@ void readAndParseData() {
     String temp = doc["T"].as<String>();
     String hum = doc["H"].as<String>();
     String q = doc["Q"].as<String>();
-    
+
     Serial.print("Received X: ");
     Serial.println(x);
     Serial.print("Received Y: ");
@@ -86,12 +86,15 @@ void readAndParseData() {
     Serial.print("Received Air Quality: ");
     Serial.println(q);
 
-
+    // Construct the URL for writing data to the server
     String url = "https://4sightmtsu.xyz/api/writeTime.php?x_coord=" + String(x) + "&y_coord=" + String(y) + "&temperature=" + String(temp) + "&humidity=" + String(hum) + "&air_quality=" + String(q) + "&orderkey=" + String(orderkey);
     http.begin(url);
+
+    // Perform a GET request to write data to the server
     int httpCode = http.GET();
     Serial.println("Request URL: " + url);
 
+    // Check if the HTTP response code is greater than 0
     if (httpCode > 0) {
       Serial.println("HttpCode is 1");
       http.end();
@@ -102,95 +105,120 @@ void readAndParseData() {
 }
 
 void getJsonData() {
+  // Check if connected to WiFi
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("Error: Not connected to WiFi");
     return;
   }
 
+  // Create an HTTP client instance
   HTTPClient http;
+  
+  // Construct the URL for the API endpoint
   String url = "https://4sightMTSU.xyz/api/waypointsV2.php?orderkey=" + String(orderkey);
+  
+  // Begin the HTTP request
   http.begin(url);
+  
+  // Perform a GET request and get the HTTP response code
   int httpCode = http.GET();
   Serial.println("Request URL: " + url);
   
+  // Check if the HTTP response code is OK (200)
   if (httpCode == HTTP_CODE_OK) {
     Serial.println("HttpCode is 200");
+
+    // Create a JSON document to store the received data
     DynamicJsonDocument doc(32876);
 
+    // Deserialize the JSON data received from the server
     DeserializationError error = deserializeJson(doc, http.getString());
 
+    // Check for deserialization errors
     if (error) {
       Serial.println("Error: Failed to deserialize JSON data");
       Serial.println(error.c_str());
       return;
     }
 
+    // Call the function to serialize and send the JSON data
     serializeJsonData(doc);
   } else {
     Serial.println("Error: Failed to retrieve JSON data from server");
     Serial.println("Error code: " + String(httpCode));
   }
 
+  // End the HTTP connection
   http.end();
 }
 
 uint32_t calculateCRC32(String str) {
+  // Calculate CRC32 checksum using FastCRC32 library
   uint32_t crc32 = FastCRC32().crc32((const uint8_t*) str.c_str(), str.length());
+  
+  // Return the calculated CRC32 checksum
   return crc32;
 }
 
 bool checkcoordinates(int previousCoordinateCounts[], bool & flag) {
+  // Update previousCountIndex for cyclic array access
   int previousCountIndex = (previousCountIndex + 1) % 2;
+
+  // Check if both previous coordinate counts are not zero
   if (previousCoordinateCounts[0] != 0 && previousCoordinateCounts[1] != 0) {
+    // Check if the previous counts are equal
     if (previousCoordinateCounts[0] == previousCoordinateCounts[1]) {
-      flag = false;
-    } 
-    else {
-      flag = true;
+      flag = false; // Coordinates are consistent
+    } else {
+      flag = true;  // Coordinates are inconsistent
     }
-  } 
-  else {
-    flag = false;
+  } else {
+    flag = false; // At least one of the previous counts is zero
   }
 
+  // Return the flag indicating coordinate consistency
   return flag;
 }
 
 void serializeJsonData(DynamicJsonDocument& doc) {
+  // Serialize the JSON document to a string
   String serializedData;
   serializeJson(doc, serializedData);
+
+  // Calculate CRC32 checksum for the serialized data
   uint32_t crc32 = calculateCRC32(serializedData);
-  
+
+  // Update coordinate count and previous CRC32 values
   coordinateCount = doc.size();
   previousCoordinateCounts[previousCountIndex] = crc32;
   previousCountIndex = (previousCountIndex + 1) % 2;
 
+  // Calculate the size and check coordinates for consistency
   size = coordinateCount / 2;
   flag = checkcoordinates(previousCoordinateCounts, flag);
+
+  // Print error flag status
   Serial.print("errorflag is: ");
   Serial.println(errorarduinoflag);
+
+  // Check conditions for sending data to Arduino
   if (flag || previousCoordinateCounts[1] == 0 || errorarduinoflag) {
     Serial.println("SENDING TO ARDUINO");
-    errorarduinoflag = false;
+    errorarduinoflag = false; // Reset error flag
 
-    // Create a new JSON document
+    // Create a new JSON document for signaling "wait"
     DynamicJsonDocument json(64);
     json["data"] = "wait";
 
-    // Serialize the JSON document to a string
+    // Serialize the "wait" JSON document to a string
     String jsonString;
     serializeJson(json, jsonString);
 
-    // Send the JSON string to the Arduino
+    // Send the "wait" JSON string to the Arduino
     nodemcu.println(jsonString);
     Serial.println(jsonString);
 
-    delay(6000); // Wait for 6 seconds
-
-    // Serialize the original JSON document to a string
-    String serializedData;
-    serializeJson(doc, serializedData);
-
+    delay(6000); // Wait for 6 seconds before sending actual data
 
     // Send the serialized data to the Arduino
     nodemcu.println(serializedData);
@@ -203,44 +231,163 @@ void serializeJsonData(DynamicJsonDocument& doc) {
     Serial.println();
   }
 
-//  Serial.println("Number of coordinates: " + String(coordinateCount));
-//  Serial.println();
+  // Uncomment the following lines for debugging purposes
+  // Serial.println("Number of coordinates: " + String(coordinateCount));
+  // Serial.println();
 }
 
 void loop() {
-  // Get new data immediately in the first iteration
-  if (lastUpdateTime == 0) {
-    lastUpdateTime = millis(); // update last update time
-    getJsonData(); // get new data
+  // Play a song (if required)
+  // playSong();
+
+  // Read the state of the switch
+  byte switchState = digitalRead(switchPin);
+  
+  // Turn on an external LED
+  analogWrite(A2, 255);
+
+  // Display sensor readings on LCD
+  lcd.setCursor(0, 0);
+  if (!bme.performReading()) {
+    Serial.println("Failed to perform reading :(");
+    return;
   }
 
-  // Check if it's time to update
-  if (millis() - lastUpdateTime >= timer) { // 30 seconds have passed
-    lastUpdateTime = millis();  // update last update time
-    getJsonData();  // get new data
+  // Temperature
+  Serial.print("Temperature = ");
+  Serial.print(bme.temperature - 2.5);
+  Serial.print(" *C = ");
+  Ftemp = ((bme.temperature - 2.5) * 1.8 + 32);
+  Serial.print(Ftemp);
+  Serial.println(" *F");
+
+  lcd.print("T=");
+  lcd.print(round(Ftemp));
+  lcd.write(byte(0));
+  lcd.print("F");
+
+  // Pressure
+  Serial.print("Pressure = ");
+  Serial.print(bme.pressure / 100.0);
+  Serial.println(" hPa");
+
+  // Air Quality
+  Serial.print("Air:");
+  Qair = (bme.gas_resistance / 1000.0);
+  Serial.print(Qair);
+  Serial.print("KOhms ");
+
+  lcd.setCursor(8, 0);
+  lcd.print("Air:");
+  if (Qair > 300) {
+    lcd.print("Good");
+    Serial.println("(Good)");
+  } else if (Qair < 120) {
+    lcd.print("Poor");
+    Serial.println("(Poor)");
+  } else {
+    lcd.print("Fair");
+    Serial.println("(Fair)");
   }
 
-  // Check if data is available
-  if (nodemcu.available()) {
-    String receivedData = nodemcu.readStringUntil('\n');
-    if (receivedData.indexOf("error") != -1) {
-      Serial.println("Received error message from Arduino!");
-      errorarduinoflag = true;
+  // Humidity
+  Serial.print("Humidity = ");
+  noHum = bme.humidity;
+  Serial.print(noHum);
+  Serial.println(" %");
+
+  lcd.setCursor(0, 1);
+  lcd.print("Humidity= ");
+  lcd.print(noHum);
+  lcd.print("%");
+
+  ct = ct + 1;
+  Serial.println(ct);
+  Serial.println();
+
+  // Handle switch state
+  if (switchState == LOW) {
+    // Turn the screen on
+    digitalWrite(screen, HIGH);
+
+    // Perform actions based on conditions
+    if ((ct > 1300) && (Qair < 20) || (Ftemp > 100)) {
+      digitalWrite(buzzer, HIGH);
     }
+
+    if ((ct > 1300) && (Qair < 70)) {
+      digitalWrite(buzzer, HIGH);
+      delay(100);
+      digitalWrite(buzzer, LOW);
+      delay(100);
+    }
+
+    if ((ct > 1300) && (Qair < 120) || (Ftemp > 90)) {
+      digitalWrite(buzzer, HIGH);
+      delay(250);
+      digitalWrite(buzzer, LOW);
+      delay(250);
+    }
+
+    if (Qair > 120) {
+      digitalWrite(buzzer, LOW);
+    }
+
+    Serial.println("switch turned on");
+  } else {
+    // Turn the screen off
+    Serial.println("switch turned off");
+    digitalWrite(screen, LOW);
   }
+
+  delay(500);
+  Serial.println(" ");
+
+  // Receive coordinates from Gauntlet
   if (gauntlet.available()) {
-    readAndParseData();
-  }
-   else {
-    // Calculate time left until next update
-    unsigned long timeLeft = timer - (millis() - lastUpdateTime);
+    String receivedData = gauntlet.readString();
+    double X_Cord, Y_Cord;
+    bool route_status = false;
 
-    // Print time left every interation second
-    if (millis() - lastPrintTime >= iterationtimer) {
-      lastPrintTime = millis();
-      Serial.print("Time left until update: ");
-      Serial.print(timeLeft);
-      Serial.println(" milliseconds");
+    DynamicJsonDocument doc(128);
+    deserializeJson(doc, receivedData);
+
+    for (JsonPair pair : doc.as<JsonObject>()) {
+      String key = pair.key().c_str();
+      String coordinate = pair.value().as<String>();
+
+      if (key == "X_Cord") {
+        X_Cord = coordinate.toDouble();
+      } else if (key == "Y_Cord") {
+        Y_Cord = coordinate.toDouble();
+      } else if (key == "route_status") {
+        route_status = true;
+        if (route_status) {
+          Serial.println("RECEIVED ROUTE STATUS!!");
+          Serial.println("ready to play song");
+          playSong();
+        }
+      }
     }
+
+    // Clear the JSON document
+    doc.clear();
+
+    // Populate JSON document with sensor data
+    doc["X"] = X_Cord;
+    doc["Y"] = Y_Cord;
+    doc["T"] = Ftemp;
+    doc["H"] = noHum;
+    doc["Q"] = Qair;
+
+    // Print JSON to Serial monitor
+    serializeJson(doc, Serial);
+
+    // Send data to NodeMCU
+    serializeJson(doc, nodemcu);
+    nodemcu.println();
+    Serial.println();
+    delay(2000);
   }
 }
+
